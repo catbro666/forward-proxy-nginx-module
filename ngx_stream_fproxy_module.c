@@ -57,11 +57,6 @@ typedef struct {
     u_char                          method; /* selected mothod */
 } ngx_stream_fproxy_ctx_t;
 
-typedef struct {
-    ngx_str_t   name;
-    ngx_str_t   passwd;
-} ngx_stream_fproxy_userpasswd_t;
-
 static const char *HTTP_METHODS[] = {
     "GET ", "PUT ", "HEAD ", "POST ", "TRACE ", "PATCH ", "DELETE ", "OPTION "
 };
