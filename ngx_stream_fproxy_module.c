@@ -532,8 +532,6 @@ ngx_stream_fproxy_socks5_method_select(ngx_stream_session_t *s)
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_fproxy_module);
     fscf = ngx_stream_get_module_srv_conf(s, ngx_stream_fproxy_module);
 
-    p = b->start;
-
     buf = ngx_palloc(c->pool, 2);
     if (buf == NULL) {
         return ngx_stream_fproxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
@@ -545,8 +543,8 @@ ngx_stream_fproxy_socks5_method_select(ngx_stream_session_t *s)
     buf[0] = NGX_STREAM_FPROXY_SOCKS5_VERSION;
     buf[1] = NGX_STREAM_FPROXY_SOCKS5_AUTH_NO_ACCEPT;
 
-    if (fscf->auth_methods | NGX_STREAM_FPROXY_AUTH_BASIC) {
-        for (p = p + 2; p < b->last; p++) {
+    if (fscf->auth_methods & NGX_STREAM_FPROXY_AUTH_BASIC) {
+        for (p = b->start + 2; p < b->last; p++) {
             if (*p == NGX_STREAM_FPROXY_SOCKS5_AUTH_BASIC) {
                 buf[1] = NGX_STREAM_FPROXY_SOCKS5_AUTH_BASIC;
                 break;
@@ -554,7 +552,7 @@ ngx_stream_fproxy_socks5_method_select(ngx_stream_session_t *s)
         }
 
     } else {
-        for (p = p + 2; p < b->last; p++) {
+        for (p = b->start + 2; p < b->last; p++) {
             if (*p == NGX_STREAM_FPROXY_SOCKS5_AUTH_NO_AUTH) {
                 buf[1] = NGX_STREAM_FPROXY_SOCKS5_AUTH_NO_AUTH;
                 break;
