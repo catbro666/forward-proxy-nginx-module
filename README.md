@@ -397,6 +397,8 @@ with authentication
 curl: (56) CONNECT tunnel failed, response 407
 ❯ curl --proxy-basic --proxy-user david:12341234 --proxy "socks5://localhost:12345" "https://httpbin.org/get"
 curl: (97) User was rejected by the SOCKS5 server (1 1).
+❯ curl --proxy "socks5://localhost:12345" "https://httpbin.org/get"
+curl: (97) No authentication method was acceptable.
 ```
 
 [Back to TOC](#table-of-contents)
