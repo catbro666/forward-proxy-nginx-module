@@ -1,0 +1,21 @@
+ngx_addon_name=ngx_stream_fproxy_module
+STREAM_FPROXY_SRCS=" \
+                    $ngx_addon_dir/ngx_stream_fproxy_module.c \
+                    "
+STREAM_FPROXY_DEPS=" \
+                    $ngx_addon_dir/ngx_stream_fproxy_module.h \
+                    "
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=STREAM
+    ngx_module_name=$ngx_addon_name
+    ngx_module_srcs="$STREAM_FPROXY_SRCS"
+    ngx_module_deps="$STREAM_FPROXY_DEPS"
+
+    . auto/module
+else
+    STREAM_MODULES="$STREAM_MODULES $ngx_addon_name"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_VTS_SRCS"
+    STREAM_DEPSS = "$STREAM_DEPS $STREAM_FPROXY_DEPS"
+fi
+
