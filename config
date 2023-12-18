@@ -15,7 +15,7 @@ if test -n "$ngx_module_link"; then
     . auto/module
 else
     STREAM_MODULES="$STREAM_MODULES $ngx_addon_name"
-    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_VTS_SRCS"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $STREAM_FPROXY_SRCS"
     STREAM_DEPSS = "$STREAM_DEPS $STREAM_FPROXY_DEPS"
 fi
 
