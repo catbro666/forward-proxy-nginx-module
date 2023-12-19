@@ -23,6 +23,9 @@ typedef struct {
 
 typedef struct {
     ngx_uint_t                       enabled_protocols;
+#if (NGX_STREAM_SSL)
+    ngx_flag_t                       ssl_optional;
+#endif
     ngx_uint_t                       auth_methods;
     ngx_hash_keys_arrays_t          *userpw_keys;
     ngx_hash_t                       userpw_hash;
@@ -78,6 +81,9 @@ static const ngx_str_t res500 =
 static const ngx_str_t res502 =
     ngx_string("HTTP/1.1 502 Bad Gateway\r\n\r\n");
 
+#if (NGX_STREAM_SSL)
+static ngx_int_t ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s);
+#endif
 static void ngx_stream_fproxy_handler(ngx_stream_session_t *s);
 static ssize_t ngx_stream_fproxy_recv_from_client(ngx_event_t *ev);
 static void ngx_stream_fproxy_greeting_handler(ngx_event_t *ev);
@@ -149,6 +155,15 @@ static ngx_command_t  ngx_stream_fproxy_commands[] = {
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_stream_fproxy_srv_conf_t, enabled_protocols),
       &ngx_stream_fproxy_protocol_types },
+
+ #if (NGX_STREAM_SSL)
+    { ngx_string("fproxy_ssl_optional"),
+      NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_fproxy_srv_conf_t, ssl_optional),
+      NULL },
+#endif
 
     { ngx_string("fproxy_auth_methods"),
       NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
@@ -286,6 +301,66 @@ ngx_module_t  ngx_stream_fproxy_module = {
     NULL,                                  /* exit master */
     NGX_MODULE_V1_PADDING
 };
+
+
+static ngx_int_t
+ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s)
+{
+    ngx_stream_fproxy_srv_conf_t    *fscf;
+    ngx_connection_t                *c;
+    u_char                           buf[1];
+    ssize_t                          n;
+    ngx_err_t                        err;
+    ngx_event_t                     *rev;
+
+    c = s->connection;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                   "stream fproxy ssl handler");
+
+    n = recv(c->fd, (char *) buf, 1, MSG_PEEK);
+
+    err = ngx_socket_errno;
+
+    if (n == -1) {
+        if (err == NGX_EAGAIN) {
+            rev = c->read;
+            rev->ready = 0;
+
+            if (!rev->timer_set) {
+                fscf = ngx_stream_get_module_srv_conf(s,
+                                                      ngx_stream_fproxy_module);
+                ngx_add_timer(rev, fscf->negotiate_timeout);
+                ngx_reusable_connection(c, 1);
+            }
+
+            if (ngx_handle_read_event(rev, 0) != NGX_OK) {
+                ngx_stream_finalize_session(s,
+                    NGX_STREAM_INTERNAL_SERVER_ERROR);
+            }
+
+            return NGX_AGAIN;
+        }
+
+        ngx_connection_error(c, err, "recv() failed");
+        ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+        return NGX_ERROR;
+    }
+
+    if (n == 1) {
+
+        if (buf[0] & 0x80 /* SSLv2 */ || buf[0] == 0x16 /* SSLv3/TLSv1 */) {
+            return NGX_DECLINED;
+
+        } else {    /* non-ssl connection */
+            return NGX_OK;
+        }
+    }
+
+    ngx_log_error(NGX_LOG_INFO, c->log, 0, "client closed connection");
+    ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+    return NGX_ERROR;
+}
 
 
 static void
@@ -2572,6 +2647,7 @@ ngx_stream_fproxy_create_srv_conf(ngx_conf_t *cf)
      *     conf->userpw_hash = {0, NULL};
      */
 
+    conf->ssl_optional = NGX_CONF_UNSET;
     conf->negotiate_timeout = NGX_CONF_UNSET_MSEC;
     conf->connect_timeout = NGX_CONF_UNSET_MSEC;
     conf->response_timeout = NGX_CONF_UNSET_MSEC;
@@ -2826,6 +2902,10 @@ ngx_stream_fproxy_postconfiguration(ngx_conf_t* cf)
 {
     ngx_stream_fproxy_srv_conf_t    *fscf;
     ngx_hash_init_t                  hash;
+#if (NGX_STREAM_SSL)
+    ngx_stream_handler_pt           *h;
+    ngx_stream_core_main_conf_t     *cmcf;
+#endif
 
     fscf = ngx_stream_conf_get_module_srv_conf(cf, ngx_stream_fproxy_module);
 
@@ -2843,6 +2923,20 @@ ngx_stream_fproxy_postconfiguration(ngx_conf_t* cf)
             return NGX_ERROR;
         }
     }
+
+#if (NGX_STREAM_SSL)
+    if (fscf->ssl_optional) {
+        cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
+
+        h = ngx_array_push(&cmcf->phases[NGX_STREAM_SSL_PHASE].handlers);
+
+        if (h == NULL) {
+            return NGX_ERROR;
+        }
+
+        *h = ngx_stream_fproxy_ssl_handler;
+    }
+#endif
 
     return NGX_OK;
 }
