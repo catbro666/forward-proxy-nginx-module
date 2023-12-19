@@ -63,6 +63,7 @@ under a different name except the first serveral ones.
 **Note** UDP is not supported, so don't add `udp` on `listen` directive when setting `fproxy_protocols`.
 
 * [fproxy_protocols](#fproxy_protocols)
+* [fproxy_ssl_optional](#fproxy_ssl_optional)
 * [fproxy_auth_methods](#fproxy_auth_methods)
 * [fproxy_user_passwd](#fproxy_user_passwd)
 * [fproxy_negotiate_timeout](#fproxy_negotiate_timeout)
@@ -91,6 +92,19 @@ fproxy_protocols
 **context:** *server*
 
 Enables forward proxy. Can Set multiple protocols supported.
+
+[Back to TOC](#directives)
+
+fproxy_ssl_optional
+-------------------
+
+**syntax:** *fproxy_ssl_optional on | off*
+
+**default:** *fproxy_ssl_optional off*
+
+**context:** *server*
+
+When setting to `on`, allows serving both HTTP/SOCKS5 proxy and HTTPS/SOCKS5 over SSL proxy on a single server.
 
 [Back to TOC](#directives)
 
