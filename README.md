@@ -1,7 +1,7 @@
 Name
 ====
 
-forward-proxy-nginx-module - A HTTP/SOCKS5 forward proxy server based on Nginx Stream Module.
+forward-proxy-nginx-module - A HTTP/SOCKS5 (also HTTPS/SOCKS5 over SSL) forward proxy server based on Nginx Stream Module.
 
 Table of Contents
 =================
@@ -15,9 +15,11 @@ Table of Contents
 Build
 =====
 
+If you want to support HTTPS proxy or SOCKS5 over SSL proxy, `--with-stream_ssl_module` is necessary.
+
 ```bash
 cd nginx
-./configure --add-module=/path/to/forward-proxy-nginx-module --with-stream
+./configure --add-module=/path/to/forward-proxy-nginx-module --with-stream --with-stream_ssl_module
 make
 make install
 ```
@@ -27,15 +29,25 @@ make install
 
 Synopsis
 ========
+
+Add `ssl` parameter on `listen` directive if you want HTTPS proxy or SOCKS5 over SSL proxy support.
+
+And the `fproxy_ssl_optional` directive allows you to serve both HTTP/SOCKS proxy and
+HTTPS/SOCKS5 over SSL proxy on a single server.
+
 ```nginx
 stream {
     resolver 8.8.8.8;
     server {
-        listen  0.0.0.0:12345;
+        listen  0.0.0.0:12345 ssl;
         fproxy_protocols HTTP SOCKS5;
+        fproxy_ssl_optional on;
         fproxy_auth_methods BASIC;
         fproxy_user_passwd john 12345678;
         fproxy_user_passwd lucy abcdefgh;
+
+        ssl_certificate server.crt;
+        ssl_certificate_key server.key;
     }
 }
 ```
@@ -313,6 +325,7 @@ without authentication
 ----------------------
 
 ```bash
+# http proxy
 ❯ curl --proxy "http://localhost:12345" "http://httpbin.org/get"
 {
   "args": {},
@@ -338,6 +351,8 @@ without authentication
   "origin": "1.1.1.1",
   "url": "https://httpbin.org/get"
 }
+
+# socks5 proxy
 ❯ curl --proxy "socks5://localhost:12345" "http://httpbin.org/get"
 {
   "args": {},
@@ -362,12 +377,40 @@ without authentication
   "origin": "1.1.1.1",
   "url": "https://httpbin.org/get"
 }
+
+# https proxy
+❯ curl --proxy-insecure --proxy "https://localhost:12345" http://httpbin.org/get
+{
+  "args": {},
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "Proxy-Connection": "Keep-Alive",
+    "User-Agent": "curl/8.1.2",
+    "X-Amzn-Trace-Id": "Root=1-6581aebd-2cd9b5e75851d7f177fd97c5"
+  },
+  "origin": "1.1.1.1",
+  "url": "http://httpbin.org/get"
+}
+❯ curl --proxy-insecure  --proxy "https://localhost:12345" https://httpbin.org/get
+{
+  "args": {},
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.1.2",
+    "X-Amzn-Trace-Id": "Root=1-6581aec2-5c249a722bb8f1de618c724b"
+  },
+  "origin": "1.1.1.1",
+  "url": "https://httpbin.org/get"
+}
 ```
 
 with authentication
 -------------------
 
 ```bash
+# http proxy
 ❯ curl --proxy-basic --proxy-user john:12345678 --proxy "http://localhost:12345" "http://httpbin.org/get"
 {
   "args": {},
@@ -381,6 +424,8 @@ with authentication
   "origin": "1.1.1.1",
   "url": "http://httpbin.org/get"
 }
+
+# socks5 proxy
 ❯ curl --proxy-basic --proxy-user lucy:abcdefgh --proxy "socks5://localhost:12345" "https://httpbin.org/get"
 {
   "args": {},
@@ -393,6 +438,22 @@ with authentication
   "origin": "1.1.1.1",
   "url": "https://httpbin.org/get"
 }
+
+# https proxy
+❯ curl --proxy-insecure --proxy-basic --proxy-user john:12345678 --proxy "https://localhost:12345" https://httpbin.org/get
+{
+  "args": {},
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.1.2",
+    "X-Amzn-Trace-Id": "Root=1-6581b116-50d337da6dc018ca1d9a0ff2"
+  },
+  "origin": "1.1.1.1",
+  "url": "https://httpbin.org/get"
+}
+
+# authentication failures
 ❯ curl --proxy-basic --proxy-user john:88888888 --proxy "http://localhost:12345" "https://httpbin.org/get"
 curl: (56) CONNECT tunnel failed, response 407
 ❯ curl --proxy-basic --proxy-user david:12341234 --proxy "socks5://localhost:12345" "https://httpbin.org/get"
