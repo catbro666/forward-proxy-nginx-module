@@ -314,9 +314,21 @@ ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s)
     ngx_event_t                     *rev;
 
     c = s->connection;
+    rev = c->read;
 
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream fproxy ssl handler");
+
+    if (rev->timedout) {
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
+        ngx_stream_finalize_session(s, NGX_STREAM_OK);
+        return NGX_ERROR;
+    }
+
+    if (c->close) {
+        ngx_stream_finalize_session(s, NGX_STREAM_OK);
+        return NGX_ERROR;
+    }
 
     n = recv(c->fd, (char *) buf, 1, MSG_PEEK);
 
@@ -324,7 +336,6 @@ ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s)
 
     if (n == -1) {
         if (err == NGX_EAGAIN) {
-            rev = c->read;
             rev->ready = 0;
 
             if (!rev->timer_set) {
@@ -343,7 +354,7 @@ ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s)
         }
 
         ngx_connection_error(c, err, "recv() failed");
-        ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+        ngx_stream_finalize_session(s, NGX_STREAM_OK);
         return NGX_ERROR;
     }
 
@@ -358,7 +369,7 @@ ngx_stream_fproxy_ssl_handler(ngx_stream_session_t *s)
     }
 
     ngx_log_error(NGX_LOG_INFO, c->log, 0, "client closed connection");
-    ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+    ngx_stream_finalize_session(s, NGX_STREAM_OK);
     return NGX_ERROR;
 }
 
